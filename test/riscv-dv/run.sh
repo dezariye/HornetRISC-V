@@ -3,16 +3,16 @@
 # Configuration
 VIVADO_VERSION="2024.1"
 PROJECT_NAME="HornetRISCV-vivado"
-PROJECT_DIR="../../../${PROJECT_NAME}" # 3 directories up relative to the "out" folder
+PROJECT_DIR="/home/deniz/${PROJECT_NAME}" # 3 directories up relative to the "out" folder
 SIM_TOP="barebones_top_tb.v"
 LOG_FILE="simulation.log"
 WAVE_CONFIG="barebones_top_tb_behav.wcfg"  # Optional waveform config
-CC32=riscv32-unknown-elf
-USE_RISCVDV=1
-TEST="riscv_floating_point_general_test"
+CC32=riscv64-unknown-elf
+USE_RISCVDV=0
+TEST="mnist"
 
 if [ "$USE_RISCVDV" -eq 1 ]; then
-    python3 run.py --verbose --test ${TEST} --simulator pyflow --isa rv32imf --mabi ilp32f --sim_opts=""
+    python3.11 run.py --verbose --test ${TEST} --simulator pyflow --isa rv32imf --mabi ilp32f --sim_opts=""
 
     if [ -d "out_$(date +%Y-%m-%d)" ]; then
         cd "out_$(date +%Y-%m-%d)"
@@ -27,16 +27,16 @@ if [ "$USE_RISCVDV" -eq 1 ]; then
     VIVADO_DURATION="1ms"
 else
     if [ -d "../${TEST}" ]; then
-        CCFLAGS="-march=rv32imf -mabi=ilp32f -Os -fno-math-errno -T ../linksc-10000.ld -lm -nostartfiles -ffunction-sections -fdata-sections -Wl,--gc-sections -g -ggdb -o ${TEST}.elf"
+        CCFLAGS="-march=rv32imf -ffp-contract=off -mabi=ilp32f -Os -fno-math-errno -T ../linksc-10000.ld -lm -nostartfiles -ffunction-sections -fdata-sections -Wl,--gc-sections -g -ggdb -o ${TEST}.elf"
         cd "../${TEST}"
-        ${CC32}-gcc ${TEST}.s ../crt0.s ${CCFLAGS} # Might need to change the test extension to .c if the test is written in C
+        ${CC32}-gcc ${TEST}.c ../crt0.s ${CCFLAGS} # Might need to change the test extension to .c if the test is written in C
         ${CC32}-objcopy -O binary -j .init -j .text -j .rodata -j .sdata ${TEST}.elf ${TEST}.bin
         ../rom_generator ${TEST}.bin
         cp ${TEST}.data ../memory_contents/instruction.data
         echo "Test compiled, running spike"
         ${SPIKE_PATH}/spike --log-commits --isa=rv32imf --priv=M -m0xf000:1,0x10000:0x8000,0x8010:1 -l --log=spike.log ${TEST}.elf
         echo "Spike simulation completed"
-        PROJECT_DIR="../../${PROJECT_NAME}" # 3 directories up relative to the test folder
+        # PROJECT_DIR="../../${PROJECT_NAME}" # 3 directories up relative to the test folder
         VIVADO_DURATION="400ms"
     else
         echo "Directory not found"
@@ -101,7 +101,7 @@ echo "Simulation log saved to ${LOG_FILE}"
 if [ "$USE_RISCVDV" -eq 1 ]; then
     cd ..
     python3 scripts/spike_log_to_trace_csv.py --log "out_$(date +%Y-%m-%d)"/spike_sim/${TEST}_0.log --csv spike_deneme.csv -f
-    python3 scripts/trace_to_csv.py -l ../../trace.log -o deneme.csv
+    python3 scripts/trace_to_csv.py -l ~/trace.log -o deneme.csv
     python3 scripts/compare.py deneme.csv spike_deneme.csv combined.csv
 
     # Add a counter to limit repetitions
@@ -137,7 +137,7 @@ if [ "$USE_RISCVDV" -eq 1 ]; then
 else
     cd "../riscv-dv"
     python3 scripts/spike_log_to_trace_csv.py --log "../${TEST}/spike.log" --csv spike_deneme.csv -f
-    python3 scripts/trace_to_csv.py -l ../../trace.log -o deneme.csv
+    python3 scripts/trace_to_csv.py -l ~/trace.log -o deneme.csv
     python3 scripts/compare.py deneme.csv spike_deneme.csv combined.csv
 fi
 
